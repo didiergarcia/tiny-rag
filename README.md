@@ -1,4 +1,5 @@
 # Tiny RAG: Simple Retrieval-Augmented Generation with TinyLlama
+![TinyRAG Architecture](assets/tiny-rag.png)
 
 This project demonstrates how to build a simple RAG (Retrieval-Augmented Generation) system using a small language model (TinyLlama-1.1B-Chat-v1.0) and FAISS vector database to answer questions about events that occurred after the model's knowledge cutoff date.
 
@@ -26,18 +27,34 @@ The project showcases how to:
 
 ## 🚀 Quick Start
 
-### 1. Upload Your PDF Document
+### 1. Prepare Your PDF Document
 
+**For Google Colab:**
 1. Create a `data` folder in your Google Colab workspace
-2. Upload your PDF file to the `data` folder
-3. Update the PDF path in the notebook to match your file name
+2. Upload the `./data/2024–25_NFL_playoffs_pg_1.pdf` PDF file using the file upload interface
+3. Ensure the PDF is accessible at `/content/data/2024–25_NFL_playoffs_pg_1.pdf`
+
+**For Local Development:**
+1. Create a `data` folder in your project directory if it doesn't exist
+2. Place the `./data/2024–25_NFL_playoffs_pg_1.pdf` PDF file in the `./data/` directory
+3. Update the notebook to read the PDF from the appropriate location.
+
+
+### 2. Update the PDF Path
+
+In the notebook, update the PDF path to match your file name:
 
 ```python
-# Example: If your PDF is named "my_document.pdf"
-pdf_text = "\n".join(block[4] for block in fitz.open("/content/data/my_document.pdf").load_page(0).get_text("blocks"))
+# For local development (relative path)
+pdf_text = "\n".join(block[4] for block in fitz.open("./data/your_document.pdf").load_page(0).get_text("blocks"))
+
+# For Google Colab (absolute path)
+pdf_text = "\n".join(block[4] for block in fitz.open("/content/data/your_document.pdf").load_page(0).get_text("blocks"))
 ```
 
-### 2. Install Dependencies
+**Important:** Replace `your_document.pdf` with the actual name of your PDF file.
+
+### 3. Install Dependencies
 
 The notebook will automatically install the required packages:
 
@@ -45,13 +62,13 @@ The notebook will automatically install the required packages:
 pip install transformers sentence_transformers faiss-cpu bitsandbytes PyMuPDF
 ```
 
-### 3. Run the Notebook
+### 4. Run the Notebook
 
-1. Open `tiny-rag.ipynb` in Google Colab
+1. Open `tiny-rag.ipynb` in Google Colab or your local Jupyter environment
 2. Run all cells sequentially
 3. The system will:
    - Load the TinyLlama model
-   - Extract text from your PDF
+   - Extract text from your PDF in the `./data/` directory
    - Create embeddings and store them in FAISS
    - Demonstrate RAG functionality with example queries
 
@@ -61,8 +78,11 @@ pip install transformers sentence_transformers faiss-cpu bitsandbytes PyMuPDF
 tiny-rag/
 ├── README.md
 ├── tiny-rag.ipynb          # Main notebook with RAG implementation
+├── assets/
+│   └── tiny-rag.png        # Architecture diagram
 └── data/
-    └── 2024–25_NFL_playoffs_pg_1.pdf  # Example PDF document
+    ├── 2024–25_NFL_playoffs_pg_1.pdf  # Example PDF document
+    └── your_document.pdf              # Add your PDFs here
 ```
 
 ## 🔧 Key Components
@@ -126,7 +146,6 @@ A: The Philadelphia Eagles defeated the Kansas City Chiefs 40-22 in Super Bowl L
 - **Inference Speed**: Fast on GPU, moderate on CPU
 - **Accuracy**: Good for factual questions with proper context
 
-
 ### Performance Tips
 
 - Use GPU acceleration when available
@@ -139,7 +158,6 @@ A: The Philadelphia Eagles defeated the Kansas City Chiefs 40-22 in Super Bowl L
 - [FAISS Documentation](https://github.com/facebookresearch/faiss)
 - [Sentence Transformers](https://www.sbert.net/)
 - [PyMuPDF Documentation](https://pymupdf.readthedocs.io/)
-
 
 ## 📄 License
 
