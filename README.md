@@ -5,6 +5,13 @@ This project demonstrates how to build a simple RAG (Retrieval-Augmented Generat
 
 At just 1.1B parameters, TinyLlama is approximately 70x smaller than Llama 2 (70B) and approximately 80x smaller than Llama 3 (80B) while still maintaining impressive performance for many tasks. This makes it ideal for resource-constrained environments or rapid prototyping of RAG systems.
 
+
+---
+#### Open in Google Colab [here](https://colab.research.google.com/drive/1T589DzokGzjVyY1SVeuvjYXldXiNRn5V?usp=sharing)
+---
+
+
+
 ## 🎯 Project Overview
 
 The project showcases how to:
