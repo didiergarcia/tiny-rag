@@ -34,7 +34,7 @@ The project showcases how to:
 **For Google Colab:**
 1. Create a `data` folder in your Google Colab workspace
 2. Upload the `./data/2024–25_NFL_playoffs_pg_1.pdf` PDF file using the file upload interface
-3. Ensure the PDF is accessible at `/content/data/2024–25_NFL_playoffs_pg_1.pdf`
+3. Ensure the PDF is accessible at `./data/2024–25_NFL_playoffs_pg_1.pdf`
 
 **For Local Development:**
 1. Create a `data` folder in your project directory if it doesn't exist
