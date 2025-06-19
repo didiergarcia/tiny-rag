@@ -3,6 +3,8 @@
 
 This project demonstrates how to build a simple RAG (Retrieval-Augmented Generation) system using a small language model (TinyLlama-1.1B-Chat-v1.0) and FAISS vector database to answer questions about events that occurred after the model's knowledge cutoff date.
 
+At just 1.1B parameters, TinyLlama is approximately 70x smaller than Llama 2 (70B) and approximately 80x smaller than Llama 3 (80B) while still maintaining impressive performance for many tasks. This makes it ideal for resource-constrained environments or rapid prototyping of RAG systems.
+
 ## 🎯 Project Overview
 
 The project showcases how to:
