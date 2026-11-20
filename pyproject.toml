@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tiny-rag"
+version = "0.1.0"
+description = "A minimal RAG library: chunk, embed, search and answer with a small LLM."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Didier Garcia" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pypdf>=4.0",
+    "sentence-transformers>=3.0",
+]
+
+[project.optional-dependencies]
+faiss = ["faiss-cpu>=1.8"]
+quant = ["bitsandbytes>=0.43", "accelerate>=0.30"]
+dev = ["pytest>=8.0", "ruff==0.17.6"]
+
+[project.urls]
+Homepage = "https://github.com/didiergarcia/tiny-rag"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tiny_rag"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/tiny_rag", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+# The notebooks keep their original step-by-step teaching code.
+extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
