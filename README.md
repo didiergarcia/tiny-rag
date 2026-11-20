@@ -2,7 +2,18 @@
 
 A minimal Python library and example notebook for RAG (TinyLlama + FAISS + sentence-transformers) that runs in under 1 GB of GPU memory.
 
-![TinyRAG Architecture](assets/tiny-rag.png)
+```mermaid
+flowchart LR
+    A[PDF / .txt / .md] --> B[Chunk by words]
+    B --> C[Embed<br/>all-MiniLM-L6-v2]
+    C --> D[(Index<br/>FAISS or NumPy)]
+    Q[Question] --> E[Embed question]
+    E --> D
+    D -->|top k chunks| F[Prompt with<br/>chat template]
+    Q --> F
+    F --> G[TinyLlama 1.1B<br/>4-bit]
+    G --> H[Answer + source chunks]
+```
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/didiergarcia/tiny-rag/blob/main/examples/tiny-rag.ipynb)
 [![CI](https://github.com/didiergarcia/tiny-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/didiergarcia/tiny-rag/actions/workflows/ci.yml)
@@ -142,7 +153,6 @@ tiny-rag/
 │   └── eval.py             # 20-question evaluation
 ├── spaces/                 # Gradio app for a Hugging Face Space
 ├── data/                   # Sample PDF and its source and license
-├── assets/tiny-rag.png     # Architecture diagram
 ├── requirements.txt        # Pinned versions for the notebook
 ├── pyproject.toml
 └── CHANGELOG.md
