@@ -25,7 +25,7 @@ flowchart TB
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/didiergarcia/tiny-rag/blob/main/examples/tiny-rag.ipynb)
 [![CI](https://github.com/didiergarcia/tiny-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/didiergarcia/tiny-rag/actions/workflows/ci.yml)
 
-This started as a learning project. The notebook asks a small model about an event after its training cutoff, sees that it doesn't know, and fixes the answer with retrieval-augmented generation (RAG) over a one-page PDF. The same steps are packaged as a small library, `tiny_rag`.
+This started as a learning project. The notebook asks a small model about an event after its training cutoff, sees that it doesn't know, and fixes the answer with retrieval-augmented generation (RAG) over a one-page PDF. The same steps are packaged as a small library, `tiny_rag`. The library examples use the more common business case for RAG: private documents the model was never trained on, here three short policies from Acme Robotics, a fictional company.
 
 ## What this shows
 
@@ -39,24 +39,28 @@ This started as a learning project. The notebook asks a small model about an eve
 ```python
 from tiny_rag import RAG, HFTransformersLLM, Index
 
-index = Index.from_files(["data/2024–25_NFL_playoffs_pg_1.pdf"], chunk_size=150)
+index = Index.from_files(
+    ["data/acme/handbook.md", "data/acme/expenses.md", "data/acme/security.md"], chunk_size=60
+)
 rag = RAG(index, HFTransformersLLM(load_in_4bit=True))
 
-answer = rag.ask("Who won the 2024 NFL Championship?", k=2)
+answer = rag.ask("What is the daily meal limit when traveling?", k=2)
 print(answer.text)
 for hit in answer.sources:
     print(f"{hit.score:.3f}  {hit.chunk.source}")
 
-index.save("nfl-index")  # later: Index.load("nfl-index")
+index.save("acme-index")  # later: Index.load("acme-index")
 ```
 
 Output from a run on an RTX 5090:
 
 ```
-The 2024 NFL Championship was won by the Philadelphia Eagles, who defeated the defending champion Kansas City Chiefs 40-22 in the Super Bowl LIX at Caesars Superdome in New Orleans, Louisiana.
-0.596  data/2024–25_NFL_playoffs_pg_1.pdf#page=1
-0.499  data/2024–25_NFL_playoffs_pg_1.pdf#page=1
+The daily meal limit when traveling for work is $75 per person.
+0.610  data/acme/expenses.md
+0.270  data/acme/handbook.md
 ```
+
+The sources show where the answer came from, so a reader can check it against the policy.
 
 The API:
 
@@ -85,18 +89,19 @@ Python 3.10 or newer. The core needs numpy, pypdf and sentence-transformers (whi
 
 ## Evaluation
 
-`examples/eval.py` asks 20 questions about the sample page and checks the results against accepted answers. The author wrote the questions and answers from the PDF text. It is a smoke test of one small document, not a benchmark.
+`examples/eval.py` asks 20 questions about the three Acme Robotics documents and checks the results against accepted answers. The author wrote the documents, the questions and the answers. It is a smoke test on about 700 words of text, not a benchmark.
 
-Results from one run (2026-11-20, RTX 5090, TinyLlama 4-bit, greedy decoding, 50-word chunks with 10-word overlap giving 12 chunks, k = 3):
+Results from one run (2026-11-20, RTX 5090, TinyLlama 4-bit, greedy decoding, 50-word chunks with 10-word overlap giving 19 chunks, k = 3):
 
 | Metric | Result |
 |---|---|
-| Retrieval hit@1: an accepted answer appears in the top chunk | 12/20 |
-| Retrieval hit@3: an accepted answer appears in one of the top 3 chunks | 17/20 |
-| Answer contains an accepted answer | 12/20 |
+| Retrieval hit@1: an accepted answer appears in the top chunk | 16/20 |
+| Retrieval hit@3: an accepted answer appears in one of the top 3 chunks | 19/20 |
+| Source hit@3: a chunk from the right document is in the top 3 | 20/20 |
+| Answer contains an accepted answer | 13/20 |
 | Answer exact match | 0/20 |
 
-Exact match is 0 because TinyLlama answers in full sentences. Typical misses: it gives the score as 52-22 instead of 40-22, calls the second round "Wild Card", and names the wrong team for several playoff seeds. Retrieval hits only check that the answer text is somewhere in a retrieved chunk.
+Retrieval works much better than generation. The default prompt tells the model to say it doesn't know when the context lacks the answer, and TinyLlama over-applies it: 11 of the 20 answers start with "The context does not contain the answer", even though the answer was retrieved. Five of those go on to give the right answer anyway, which counts as correct here; six end with no answer, and they account for six of the seven misses. The seventh is a wrong number: it applies the $250 hotel limit to New York instead of $350. Exact match is 0 because TinyLlama answers in full sentences.
 
 ```bash
 python examples/eval.py            # needs an NVIDIA GPU for 4-bit
@@ -141,7 +146,7 @@ The tests use a fake embedder and a fake LLM, so they run on CPU without downloa
 
 ## Limitations
 
-- The sample data is one page of one document, and the evaluation has 20 questions.
+- The sample data is small: one PDF page for the notebook and about 700 words of fictional policies for the library examples. The evaluation has 20 questions.
 - Chunking splits on words; it does not follow sentences or sections.
 - `RAG.ask` returns the chunks it gave the model, but the model does not cite them, and answers can still be wrong (see Evaluation).
 - 4-bit loading needs an NVIDIA GPU. Without it the model loads unquantized in bf16, which took 2.05 GB.
@@ -155,11 +160,13 @@ tiny-rag/
 ├── src/tiny_rag/           # The library
 ├── tests/                  # pytest suite (no model downloads)
 ├── examples/
-│   ├── tiny-rag.ipynb      # Step-by-step notebook, then the same thing with the library
+│   ├── tiny-rag.ipynb      # Step-by-step notebook (NFL example), then the same thing with the library
 │   ├── quickstart.py       # The example above
-│   └── eval.py             # 20-question evaluation
+│   └── eval.py             # 20-question evaluation over the Acme documents
 ├── spaces/                 # Gradio app for a Hugging Face Space
-├── data/                   # Sample PDF and its source and license
+├── data/
+│   ├── acme/               # Fictional Acme Robotics policies (library examples, eval, Space)
+│   └── ...pdf              # Wikipedia page (notebook), with its source and license in data/README.md
 ├── requirements.txt        # Pinned versions for the notebook
 ├── pyproject.toml
 └── CHANGELOG.md
@@ -174,4 +181,4 @@ tiny-rag/
 
 ## License
 
-The code is MIT licensed (see [LICENSE](LICENSE)). The sample PDF is Wikipedia content under CC BY-SA 4.0 (see [data/README.md](data/README.md)). The notebook's step-by-step section uses PyMuPDF, which is licensed under AGPL-3.0; the library uses pypdf (BSD) instead.
+The code and the fictional Acme Robotics documents are MIT licensed (see [LICENSE](LICENSE)). The notebook's sample PDF is Wikipedia content under CC BY-SA 4.0 (see [data/README.md](data/README.md)). The notebook's step-by-step section uses PyMuPDF, which is licensed under AGPL-3.0; the library uses pypdf (BSD) instead.

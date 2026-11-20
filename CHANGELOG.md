@@ -8,6 +8,7 @@ First version of the `tiny_rag` library, built from the notebook.
 - `RAG.ask`: retrieve the top chunks, prompt the model with its chat template, and return the answer with the chunks it used.
 - LLM backends: `HFTransformersLLM` (TinyLlama by default, optional 4-bit) and `OpenAICompatibleLLM` (any `/chat/completions` server).
 - pytest suite that runs on CPU without model downloads, and GitHub Actions CI for Python 3.10–3.12.
-- `examples/eval.py`: a 20-question evaluation over the sample PDF.
-- `spaces/app.py`: a Gradio demo for a Hugging Face Space.
+- Sample data for the library: three short policy documents from Acme Robotics, a fictional company (`data/acme/`).
+- `examples/eval.py`: a 20-question evaluation over the Acme documents.
+- `spaces/app.py`: a Gradio demo for a Hugging Face Space that answers questions about the Acme documents.
 - The notebook moved to `examples/` and gained a section that uses the library.

@@ -1,12 +1,14 @@
-"""A tiny evaluation of tiny-rag over the sample PDF.
+"""A tiny evaluation of tiny-rag over the Acme Robotics sample documents.
 
-Reports, for 20 hand-written questions about the one-page sample document:
+Reports, for 20 hand-written questions about the three fictional policy documents in
+data/acme/ (handbook, expenses, security):
 - retrieval hit@1 and hit@k: an accepted answer appears in the top 1 / top k chunks
+- source hit@k: a chunk from the right document is in the top k
 - answer exact match: the whole answer equals an accepted answer (after normalizing)
 - answer contains: an accepted answer appears in the model's answer as whole words
 
-The questions and accepted answers were drafted from the PDF text by the author.
-This is a smoke test for one small document, not a benchmark.
+The documents, questions and accepted answers were written by the author.
+This is a smoke test on a few small documents, not a benchmark.
 
 Run from the repo root:
     python examples/eval.py                # TinyLlama, 4-bit (NVIDIA GPU)
@@ -25,41 +27,62 @@ from pathlib import Path
 
 from tiny_rag import RAG, HFTransformersLLM, Index
 
-PDF = Path(__file__).resolve().parent.parent / "data" / "2024–25_NFL_playoffs_pg_1.pdf"
+DOCS = Path(__file__).resolve().parent.parent / "data" / "acme"
 
+# (question, accepted answers, document that holds the answer)
 QA = [
-    ("Who won Super Bowl LIX?", ["philadelphia eagles", "eagles"]),
-    ("Which team lost Super Bowl LIX?", ["kansas city chiefs", "chiefs"]),
-    ("What was the final score of Super Bowl LIX?", ["40-22"]),
-    ("In which stadium was Super Bowl LIX played?", ["caesars superdome"]),
-    ("In which city was Super Bowl LIX played?", ["new orleans"]),
-    ("On what date did the 2024 NFL playoffs begin?", ["january 11"]),
-    ("On what date was Super Bowl LIX played?", ["february 9"]),
-    ("How many teams were in the 2024-25 NFL playoffs?", ["14", "fourteen"]),
-    ("How many games were played in the 2024-25 NFL playoffs?", ["13", "thirteen"]),
-    ("Who were the defending champions in the 2024-25 NFL playoffs?", ["kansas city chiefs"]),
+    ("How many vacation days do full-time employees get per year?", ["18", "eighteen"], "handbook"),
     (
-        "Name one of the conference runners-up in the 2024-25 NFL playoffs.",
-        ["buffalo bills", "washington commanders", "bills", "commanders"],
+        "How many vacation days per year do employees get after five years of service?",
+        ["23", "twenty-three", "twenty three"],
+        "handbook",
     ),
     (
-        "How many Super Bowls have the Philadelphia Eagles won, counting Super Bowl LIX?",
-        ["two", "2", "second"],
+        "How much unused vacation can be carried over to the next year?",
+        ["5 days", "five days"],
+        "handbook",
     ),
-    ("What is the first round of the NFL playoffs called?", ["wild card"]),
-    ("What is the second round of the NFL playoffs called?", ["divisional"]),
+    ("When do carried-over vacation days expire?", ["march 31"], "handbook"),
     (
-        "Which seed receives a first-round bye?",
-        ["1 seed", "seed 1", "number 1", "no 1", "first seed", "top seed", "1st seed"],
+        "How many sick days does each employee get per year?",
+        ["10 sick", "10 days", "ten sick", "ten days"],
+        "handbook",
     ),
     (
-        "Which seeds do the wild card teams get?",
-        ["5-7", "5 to 7", "5 through 7", "5 6 and 7", "5 6 7"],
+        "When is a doctor's note required for sick leave?",
+        ["3 consecutive", "three consecutive", "more than 3", "more than three"],
+        "handbook",
     ),
-    ("Which team was the number 1 seed in the NFC?", ["detroit lions", "lions"]),
-    ("Which team was the number 2 seed in the AFC?", ["buffalo bills", "bills"]),
-    ("Which team was the number 4 seed in the NFC?", ["los angeles rams", "rams"]),
-    ("Which team was the number 7 seed in the AFC?", ["denver broncos", "broncos"]),
+    ("How long is paid parental leave?", ["16 weeks", "sixteen weeks"], "handbook"),
+    (
+        "How many days per week must hybrid employees work from the office?",
+        ["2 days", "two days"],
+        "handbook",
+    ),
+    ("How much is the home office stipend?", ["600"], "handbook"),
+    ("How long is the probation period for new employees?", ["90 days", "ninety days"], "handbook"),
+    ("What is the daily meal limit when traveling?", ["75"], "expenses"),
+    ("What is the hotel limit per night in most cities?", ["250"], "expenses"),
+    ("What is the hotel limit per night in New York?", ["350"], "expenses"),
+    ("Expenses above what amount need a receipt?", ["25"], "expenses"),
+    ("How soon must expense reports be submitted?", ["30 days", "thirty days"], "expenses"),
+    (
+        "Who must approve a single expense above $10,000?",
+        ["cfo", "chief financial officer"],
+        "expenses",
+    ),
+    ("What is the mileage reimbursement rate?", ["0.67", "67 cents"], "expenses"),
+    ("What is the minimum password length?", ["14"], "security"),
+    (
+        "How quickly must a lost laptop be reported to IT Security?",
+        ["1 hour", "one hour", "an hour"],
+        "security",
+    ),
+    (
+        "After how many minutes does a laptop screen lock?",
+        ["5 minutes", "five minutes"],
+        "security",
+    ),
 ]
 
 
@@ -87,13 +110,14 @@ def main() -> int:
     parser.add_argument("--json", type=Path, help="also write per-question results here")
     args = parser.parse_args()
 
-    index = Index.from_files([PDF], chunk_size=args.chunk_size, overlap=args.overlap)
+    files = sorted(DOCS.glob("*.md"))
+    index = Index.from_files(files, chunk_size=args.chunk_size, overlap=args.overlap)
     llm = HFTransformersLLM(load_in_4bit=not args.no_4bit)
     rag = RAG(index, llm, max_new_tokens=100)
 
     rows = []
     started = time.perf_counter()
-    for question, answers in QA:
+    for question, answers, doc in QA:
         hits = index.search(question, k=args.k)
         result = rag.ask(question, k=args.k)
         rows.append(
@@ -102,6 +126,7 @@ def main() -> int:
                 "answer": result.text,
                 "hit@1": contains(hits[0].chunk.text, answers),
                 f"hit@{args.k}": any(contains(h.chunk.text, answers) for h in hits),
+                f"source@{args.k}": any(Path(h.chunk.source).stem == doc for h in hits),
                 "exact": exact(result.text, answers),
                 "contains": contains(result.text, answers),
             }
@@ -119,6 +144,7 @@ def main() -> int:
     n = len(rows)
     summary = {
         "questions": n,
+        "documents": len(files),
         "chunks_in_index": len(index),
         "chunk_size": args.chunk_size,
         "overlap": args.overlap,
@@ -129,7 +155,7 @@ def main() -> int:
         "device": device,
         "seconds": round(elapsed, 1),
     }
-    for key in ["hit@1", f"hit@{args.k}", "exact", "contains"]:
+    for key in ["hit@1", f"hit@{args.k}", f"source@{args.k}", "exact", "contains"]:
         summary[key] = f"{sum(r[key] for r in rows)}/{n}"
     print("\n" + json.dumps(summary, indent=2))
     if args.json:
