@@ -1,0 +1,10 @@
+# Pinned versions that ran tiny-rag.ipynb top to bottom on 2026-11-20
+# (Ubuntu 24.04, Python 3.12, NVIDIA RTX 5090).
+# 4-bit loading with bitsandbytes needs an NVIDIA GPU with CUDA.
+torch==2.15.0
+transformers==5.23.0
+accelerate==1.16.0
+bitsandbytes==0.50.2
+sentence-transformers==6.3.0
+faiss-cpu==1.16.0
+PyMuPDF==2.1

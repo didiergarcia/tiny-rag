@@ -1,177 +1,103 @@
-# Tiny RAG: Simple Retrieval-Augmented Generation with TinyLlama
+# Tiny RAG
+
+A minimal RAG example notebook (TinyLlama + FAISS + sentence-transformers) that runs in under 1 GB of GPU memory.
+
 ![TinyRAG Architecture](assets/tiny-rag.png)
 
-This project demonstrates how to build a simple RAG (Retrieval-Augmented Generation) system using a small language model (TinyLlama-1.1B-Chat-v1.0) and FAISS vector database to answer questions about events that occurred after the model's knowledge cutoff date.
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/didiergarcia/tiny-rag/blob/main/tiny-rag.ipynb)
 
-At just 1.1B parameters, TinyLlama is approximately 70x smaller than Llama 2 (70B) and approximately 80x smaller than Llama 3 (80B) while still maintaining impressive performance for many tasks. This makes it ideal for resource-constrained environments or rapid prototyping of RAG systems.
+This is a learning project. One notebook asks a small model about an event after its training cutoff, sees that it doesn't know, and then fixes the answer with retrieval-augmented generation (RAG) over a one-page PDF.
 
+## What this shows
 
----
-#### Open in Google Colab [here](https://colab.research.google.com/drive/1T589DzokGzjVyY1SVeuvjYXldXiNRn5V?usp=sharing)
----
+- **4-bit quantized generation** with `transformers` and `bitsandbytes`: [TinyLlama-1.1B-Chat-v1.0](https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0) loaded in NF4 with double quantization, prompted through the model's own chat template.
+- **Embeddings** with `sentence-transformers` ([all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)).
+- **A FAISS index** (`IndexFlatL2`) for finding the chunk closest to a question.
+- **Small memory use.** Measured in the notebook's last cell: the 4-bit model takes 0.70 GB, and peak GPU memory for the whole notebook is 0.89 GB (RTX 5090).
 
+## What happens in the notebook
 
+| Step | Question | Model's answer (from the committed run) |
+|---|---|---|
+| No context | Who won the 2024 NFL Championship? | "The 2024 NFL Championship will be the Super Bowl, which will be held in the United States." (It doesn't know, and treats the game as a future event.) |
+| Context pasted by hand | same | "…won by the Philadelphia Eagles, who defeated the defending champion Kansas City Chiefs 40-22 in the Super Bowl LIX." |
+| Context found by retrieval | same | "…won by the Philadelphia Eagles, who defeated the defending champion Kansas City Chiefs 40-22 in Super Bowl LIX at Caesars Superdome in New Orleans, Louisiana." |
 
-## 🎯 Project Overview
+The retrieval steps:
+1. Extract the text of the PDF's first page with PyMuPDF.
+2. Split it into 150-word chunks (4 chunks for this page).
+3. Embed each chunk and add the embeddings to a FAISS index.
+4. Embed the question, search for the 3 nearest chunks, and put the top match into the prompt.
 
-The project showcases how to:
-- Use a compact 1.1B parameter model (TinyLlama) for RAG applications
-- Set up a FAISS vector database for document retrieval
-- Extract and chunk text from PDF documents
-- Generate embeddings using sentence transformers
-- Retrieve relevant context and generate accurate answers
+## Quickstart
 
-## 🏗️ Architecture
+### Colab
 
-- **Language Model**: TinyLlama/TinyLlama-1.1B-Chat-v1.0 (4-bit quantized, ~700MB)
-- **Vector Database**: FAISS (Facebook AI Similarity Search)
-- **Embeddings**: all-MiniLM-L6-v2 sentence transformer
-- **Document Processing**: PyMuPDF for PDF text extraction
+1. Click **Open in Colab** above.
+2. Choose a GPU runtime: Runtime → Change runtime type → T4 GPU.
+3. Run all cells. The notebook installs pinned packages and downloads the sample PDF itself.
 
-## 📋 Prerequisites
+### Local
 
-- Google Colab (recommended) or local Python environment
-- Python 3.8+
-- GPU support (optional but recommended for faster inference)
-
-## 🚀 Quick Start
-
-### 1. Prepare Your PDF Document
-
-**For Google Colab:**
-1. Create a `data` folder in your Google Colab workspace
-2. Upload the `./data/2024–25_NFL_playoffs_pg_1.pdf` PDF file using the file upload interface
-3. Ensure the PDF is accessible at `./data/2024–25_NFL_playoffs_pg_1.pdf`
-
-**For Local Development:**
-1. Create a `data` folder in your project directory if it doesn't exist
-2. Place the `./data/2024–25_NFL_playoffs_pg_1.pdf` PDF file in the `./data/` directory
-3. Update the notebook to read the PDF from the appropriate location.
-
-
-### 2. Update the PDF Path
-
-In the notebook, update the PDF path to match your file name:
-
-```python
-# For local development (relative path)
-pdf_text = "\n".join(block[4] for block in fitz.open("./data/your_document.pdf").load_page(0).get_text("blocks"))
-
-# For Google Colab (absolute path)
-pdf_text = "\n".join(block[4] for block in fitz.open("/content/data/your_document.pdf").load_page(0).get_text("blocks"))
-```
-
-**Important:** Replace `your_document.pdf` with the actual name of your PDF file.
-
-### 3. Install Dependencies
-
-The notebook will automatically install the required packages:
+You need an NVIDIA GPU with CUDA, because bitsandbytes 4-bit loading does not run on CPU.
 
 ```bash
-pip install transformers sentence_transformers faiss-cpu bitsandbytes PyMuPDF
+git clone https://github.com/didiergarcia/tiny-rag.git
+cd tiny-rag
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt jupyter
+jupyter notebook tiny-rag.ipynb
 ```
 
-### 4. Run the Notebook
+`requirements.txt` pins the versions that ran the notebook top to bottom on Ubuntu 24.04 with Python 3.12 and an RTX 5090:
 
-1. Open `tiny-rag.ipynb` in Google Colab or your local Jupyter environment
-2. Run all cells sequentially
-3. The system will:
-   - Load the TinyLlama model
-   - Extract text from your PDF in the `./data/` directory
-   - Create embeddings and store them in FAISS
-   - Demonstrate RAG functionality with example queries
+```
+torch==2.15.0  transformers==5.23.0  accelerate==1.16.0  bitsandbytes==0.50.2
+sentence-transformers==6.3.0  faiss-cpu==1.16.0  PyMuPDF==2.1
+```
 
-## 📁 Project Structure
+## Limitations
+
+- It is an educational demo, not a reusable package or a production system.
+- It uses one document: the first page of one PDF.
+- It asks one question. There is no evaluation set and no accuracy numbers.
+- It retrieves 3 chunks but puts only the top one into the prompt.
+- Chunking is a plain 150-word split with no overlap.
+- 4-bit loading needs an NVIDIA GPU; the notebook does not run on CPU as written.
+- Answers come from greedy decoding and can differ with other package versions or hardware.
+
+## Roadmap
+
+Possible next steps, none of which exist yet:
+
+- Move the notebook logic into a small Python package with a typed API (`Index`, `RAG`, pluggable LLM backends).
+- Add tests and CI that run on CPU.
+- Add a small question set that reports retrieval hit@k and answer accuracy.
+- Add a Gradio demo that can run as a Hugging Face Space.
+
+## Project structure
 
 ```
 tiny-rag/
 ├── README.md
-├── tiny-rag.ipynb          # Main notebook with RAG implementation
+├── LICENSE
+├── requirements.txt
+├── tiny-rag.ipynb          # The notebook
 ├── assets/
 │   └── tiny-rag.png        # Architecture diagram
 └── data/
-    ├── 2024–25_NFL_playoffs_pg_1.pdf  # Example PDF document
-    └── your_document.pdf              # Add your PDFs here
+    ├── README.md           # Source and license of the sample PDF
+    └── 2024–25_NFL_playoffs_pg_1.pdf
 ```
 
-## 🔧 Key Components
+## Resources
 
-### Model Setup
-- Uses 4-bit quantization for memory efficiency
-- Loads TinyLlama-1.1B-Chat-v1.0 model (~700MB on disk, ~1GB RAM)
-- Configured for conversational chat format
-
-### Document Processing
-- Extracts text from PDF using PyMuPDF
-- Chunks text into smaller segments (150 words per chunk)
-- Creates embeddings for each chunk using sentence transformers
-
-### Vector Database
-- FAISS IndexFlatL2 for L2 distance similarity search
-- Stores document embeddings for fast retrieval
-- Returns top-k most similar chunks for context
-
-### RAG Pipeline
-1. **Query**: User asks a question
-2. **Retrieval**: System finds relevant document chunks
-3. **Generation**: Model generates answer using retrieved context
-
-## 💡 Example Usage
-
-The notebook demonstrates the RAG system with an NFL championship question:
-
-**Without RAG (Model hallucination):**
-```
-Q: Who won the 2024 NFL Championship?
-A: The Los Angeles Rams (incorrect)
-```
-
-**With RAG (Accurate answer):**
-```
-Q: Who won the 2024 NFL Championship?
-A: The Philadelphia Eagles defeated the Kansas City Chiefs 40-22 in Super Bowl LIX
-```
-
-## 🎛️ Configuration
-
-### Model Parameters
-- **Model**: TinyLlama/TinyLlama-1.1B-Chat-v1.0
-- **Quantization**: 4-bit (nf4)
-- **Compute dtype**: bfloat16
-- **Max tokens**: 300 (configurable)
-
-### Chunking Parameters
-- **Chunk size**: 150 words (configurable)
-- **Overlap**: None (can be added for better context)
-
-### Retrieval Parameters
-- **Top-k**: 3 chunks (configurable)
-- **Similarity metric**: L2 distance
-
-## 📊 Performance
-
-- **Model Size**: ~700MB (4-bit quantized)
-- **Memory Usage**: ~1GB RAM
-- **Inference Speed**: Fast on GPU, moderate on CPU
-- **Accuracy**: Good for factual questions with proper context
-
-### Performance Tips
-
-- Use GPU acceleration when available
-- Adjust chunk size based on your document characteristics
-- Consider using multiple smaller documents instead of one large document
-
-## 📚 Resources
-
-- [TinyLlama Paper](https://arxiv.org/abs/2401.02385)
-- [FAISS Documentation](https://github.com/facebookresearch/faiss)
+- [TinyLlama paper](https://arxiv.org/abs/2401.02385)
+- [FAISS](https://github.com/facebookresearch/faiss)
 - [Sentence Transformers](https://www.sbert.net/)
-- [PyMuPDF Documentation](https://pymupdf.readthedocs.io/)
+- [bitsandbytes quantization in transformers](https://huggingface.co/docs/transformers/main/en/quantization/bitsandbytes)
+- [PyMuPDF](https://pymupdf.readthedocs.io/)
 
-## 📄 License
+## License
 
-This project is open source and available under the MIT License.
-
----
-
-**Note**: This project is for educational purposes and demonstrates the basic concepts of RAG systems. For production use, consider more robust solutions with better error handling, security, and scalability features. 
+The code is MIT licensed (see [LICENSE](LICENSE)). The sample PDF is Wikipedia content under CC BY-SA 4.0 (see [data/README.md](data/README.md)). PyMuPDF, which the notebook installs, is licensed under AGPL-3.0.
