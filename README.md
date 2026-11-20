@@ -3,16 +3,23 @@
 A minimal Python library and example notebook for RAG (TinyLlama + FAISS + sentence-transformers) that runs in under 1 GB of GPU memory.
 
 ```mermaid
-flowchart LR
-    A[PDF / .txt / .md] --> B[Chunk by words]
-    B --> C[Embed<br/>all-MiniLM-L6-v2]
-    C --> D[(Index<br/>FAISS or NumPy)]
-    Q[Question] --> E[Embed question]
-    E --> D
-    D -->|top k chunks| F[Prompt with<br/>chat template]
-    Q --> F
-    F --> G[TinyLlama 1.1B<br/>4-bit]
-    G --> H[Answer + source chunks]
+flowchart TB
+    subgraph build["1 · Build the index (once)"]
+        direction LR
+        A[PDF / .txt / .md] --> B[Chunk by words] --> C[Embed<br/>all-MiniLM-L6-v2] --> D[(Index<br/>FAISS or NumPy)]
+    end
+    subgraph ask["2 · Ask a question"]
+        direction LR
+        Q[Question] --> S[Embed and search<br/>top k chunks] --> P[Prompt:<br/>question + chunks] --> G[TinyLlama 1.1B<br/>4-bit] --> H[Answer +<br/>source chunks]
+    end
+    build --> ask
+
+    classDef doc fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef model fill:#fef3c7,stroke:#d97706,color:#0f172a
+    classDef store fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    class A,Q,H doc
+    class C,G model
+    class D,S store
 ```
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/didiergarcia/tiny-rag/blob/main/examples/tiny-rag.ipynb)
