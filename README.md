@@ -89,7 +89,7 @@ Python 3.10 or newer. The core needs numpy, pypdf and sentence-transformers (whi
 
 ## Evaluation
 
-`examples/eval.py` asks 20 questions about the three Acme Robotics documents and checks the results against accepted answers. The author wrote the documents, the questions and the answers. It is a smoke test on about 700 words of text, not a benchmark.
+`examples/eval.py` asks 20 questions about the three Acme Robotics documents and checks the answers against accepted answers. It also asks 6 questions the documents can't answer, to see whether the model says so. The author wrote the documents, the questions and the answers. It is a smoke test on about 700 words of text, not a benchmark.
 
 Results from one run (2026-11-20, RTX 5090, TinyLlama 4-bit, greedy decoding, 50-word chunks with 10-word overlap giving 19 chunks, k = 3):
 
@@ -98,14 +98,29 @@ Results from one run (2026-11-20, RTX 5090, TinyLlama 4-bit, greedy decoding, 50
 | Retrieval hit@1: an accepted answer appears in the top chunk | 16/20 |
 | Retrieval hit@3: an accepted answer appears in one of the top 3 chunks | 19/20 |
 | Source hit@3: a chunk from the right document is in the top 3 | 20/20 |
-| Answer contains an accepted answer | 13/20 |
+| Answer contains an accepted answer | 15/20 |
 | Answer exact match | 0/20 |
+| Unanswerable questions where the answer says the context doesn't have it | 2/6 |
 
-Retrieval works much better than generation. The default prompt tells the model to say it doesn't know when the context lacks the answer, and TinyLlama over-applies it: 11 of the 20 answers start with "The context does not contain the answer", even though the answer was retrieved. Five of those go on to give the right answer anyway, which counts as correct here; six end with no answer, and they account for six of the seven misses. The seventh is a wrong number: it applies the $250 hotel limit to New York instead of $350. Exact match is 0 because TinyLlama answers in full sentences.
+Retrieval works much better than generation. The five misses mostly take a detail from nearby text: 18 vacation days instead of 23 after five years, the $250 hotel limit for New York instead of $350, $2,000 instead of $25 for receipts, the approval rules instead of the 30-day deadline, and "the end of the calendar year" instead of March 31 for carried-over vacation. Exact match is 0 because TinyLlama answers in full sentences.
+
+On the 6 unanswerable questions the model invents answers, for example "The per diem for meals in Paris is $0.67" (the mileage rate). Check answers against the returned sources.
+
+### The system prompt
+
+An earlier default prompt said "If the context does not contain the answer, say you don't know." TinyLlama over-applied it. The current default says "Check the context carefully before saying that you don't know." The current prompt was chosen on 10 separate practice questions (7/10 correct against 5/10), not on this evaluation. Both prompts on the evaluation:
+
+| Prompt | Correct (of 20) | Answers to answerable questions that say the context lacks the answer | Unanswerable questions where it says so (of 6) |
+|---|---|---|---|
+| "…If the context does not contain the answer, say you don't know." | 13 | 11 | 4 |
+| "…Check the context carefully before saying that you don't know." (default) | 15 | 0 | 2 |
+
+The old prompt made the model say "the context does not contain the answer" almost regardless of the context, so the phrase carried no information; it still invented a 401(k) match of 100% and the same Paris per diem.
 
 ```bash
-python examples/eval.py            # needs an NVIDIA GPU for 4-bit
-python examples/eval.py --no-4bit  # no quantization (bf16)
+python examples/eval.py                           # needs an NVIDIA GPU for 4-bit
+python examples/eval.py --no-4bit                 # no quantization (bf16)
+python examples/eval.py --system-prompt "..."     # compare another prompt
 ```
 
 ## Quickstart

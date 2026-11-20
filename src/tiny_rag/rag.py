@@ -6,9 +6,12 @@ from .index import Index
 from .llm import LLM
 from .types import Answer, Hit
 
+# "If the context does not contain the answer, say you don't know." made TinyLlama open 11 of
+# 20 answerable eval questions with "The context does not contain the answer"; this wording
+# scored better on held-out practice questions (7/10 vs 5/10). See README, Evaluation.
 DEFAULT_SYSTEM_PROMPT = (
     "You are a helpful assistant. Answer the question using only the context. "
-    "If the context does not contain the answer, say you don't know."
+    "Check the context carefully before saying that you don't know."
 )
 
 

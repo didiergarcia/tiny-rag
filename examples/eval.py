@@ -6,6 +6,9 @@ data/acme/ (handbook, expenses, security):
 - source hit@k: a chunk from the right document is in the top k
 - answer exact match: the whole answer equals an accepted answer (after normalizing)
 - answer contains: an accepted answer appears in the model's answer as whole words
+- false abstentions: answers to those 20 that say the context lacks the answer
+And, for 6 questions the documents cannot answer:
+- abstained: the answer says the context does not have it (checked by phrase matching)
 
 The documents, questions and accepted answers were written by the author.
 This is a smoke test on a few small documents, not a benchmark.
@@ -13,6 +16,7 @@ This is a smoke test on a few small documents, not a benchmark.
 Run from the repo root:
     python examples/eval.py                # TinyLlama, 4-bit (NVIDIA GPU)
     python examples/eval.py --no-4bit      # no quantization, bf16 (GPU or CPU)
+    python examples/eval.py --system-prompt "..."   # try another system prompt
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ import time
 from pathlib import Path
 
 from tiny_rag import RAG, HFTransformersLLM, Index
+from tiny_rag.rag import DEFAULT_SYSTEM_PROMPT
 
 DOCS = Path(__file__).resolve().parent.parent / "data" / "acme"
 
@@ -85,6 +90,24 @@ QA = [
     ),
 ]
 
+# Questions the documents do not answer. A good answer says so.
+UNANSWERABLE = [
+    "What is the per diem for meals in Paris?",
+    "Which dental insurance provider does Acme Robotics use?",
+    "How many employees does Acme Robotics have?",
+    "What is the 401(k) matching percentage?",
+    "Who is the CEO of Acme Robotics?",
+    "How many days of bereavement leave do employees get?",
+]
+
+# simplification: phrase matching, so an unusual way of saying "not in the context" is missed;
+# read the printed answers (or --json) to check.
+ABSTAIN = re.compile(
+    r"does not (contain|mention|provide|specify)|don'?t know|do not know|not mentioned"
+    r"|not (specified|provided|stated)|no information|cannot be answered",
+    re.IGNORECASE,
+)
+
 
 def normalize(text: str) -> str:
     text = text.lower().replace("–", "-").replace("—", "-")
@@ -107,13 +130,14 @@ def main() -> int:
     parser.add_argument("--chunk-size", type=int, default=50)
     parser.add_argument("--overlap", type=int, default=10)
     parser.add_argument("--no-4bit", action="store_true", help="skip 4-bit quantization")
+    parser.add_argument("--system-prompt", default=DEFAULT_SYSTEM_PROMPT)
     parser.add_argument("--json", type=Path, help="also write per-question results here")
     args = parser.parse_args()
 
     files = sorted(DOCS.glob("*.md"))
     index = Index.from_files(files, chunk_size=args.chunk_size, overlap=args.overlap)
     llm = HFTransformersLLM(load_in_4bit=not args.no_4bit)
-    rag = RAG(index, llm, max_new_tokens=100)
+    rag = RAG(index, llm, system_prompt=args.system_prompt, max_new_tokens=100)
 
     rows = []
     started = time.perf_counter()
@@ -129,12 +153,23 @@ def main() -> int:
                 f"source@{args.k}": any(Path(h.chunk.source).stem == doc for h in hits),
                 "exact": exact(result.text, answers),
                 "contains": contains(result.text, answers),
+                "false abstentions": bool(ABSTAIN.search(result.text)),
             }
         )
         r = rows[-1]
         print(
             f"[{'R' if r[f'hit@{args.k}'] else '-'}{'A' if r['contains'] else '-'}] "
             f"{question}\n      -> {result.text[:120]!r}"
+        )
+    unanswerable = []
+    for question in UNANSWERABLE:
+        text = rag.ask(question, k=args.k).text
+        unanswerable.append(
+            {"question": question, "answer": text, "abstained": bool(ABSTAIN.search(text))}
+        )
+        print(
+            f"[{'abstained' if unanswerable[-1]['abstained'] else 'ANSWERED'}] {question}\n"
+            f"      -> {text[:120]!r}"
         )
     elapsed = time.perf_counter() - started
 
@@ -152,14 +187,21 @@ def main() -> int:
         "llm": llm.name,
         "4bit": not args.no_4bit,
         "embedder": index.embedder.name,
+        "system_prompt": args.system_prompt,
         "device": device,
         "seconds": round(elapsed, 1),
     }
-    for key in ["hit@1", f"hit@{args.k}", f"source@{args.k}", "exact", "contains"]:
+    keys = ["hit@1", f"hit@{args.k}", f"source@{args.k}", "exact", "contains", "false abstentions"]
+    for key in keys:
         summary[key] = f"{sum(r[key] for r in rows)}/{n}"
+    summary["unanswerable abstained"] = (
+        f"{sum(u['abstained'] for u in unanswerable)}/{len(unanswerable)}"
+    )
     print("\n" + json.dumps(summary, indent=2))
     if args.json:
-        args.json.write_text(json.dumps({"summary": summary, "rows": rows}, indent=2))
+        args.json.write_text(
+            json.dumps({"summary": summary, "rows": rows, "unanswerable": unanswerable}, indent=2)
+        )
     return 0
 
 
