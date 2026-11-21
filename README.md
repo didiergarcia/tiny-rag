@@ -129,7 +129,7 @@ python examples/eval.py --system-prompt "..."     # compare another prompt
 
 1. Click **Open in Colab** above.
 2. Choose a GPU runtime: Runtime → Change runtime type → T4 GPU.
-3. Run all cells. The notebook installs pinned packages and downloads the sample PDF itself.
+3. Run all cells. The notebook installs pinned packages and downloads the sample PDF itself. It was tested this way on a Colab T4 (2026-11-20).
 
 ### Notebook locally
 
